@@ -3,11 +3,13 @@ FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
 
 # Copy the project file and restore dependencies
-COPY GuitarCenterBot.csproj ./
-RUN dotnet restore
+# Assuming your project folder is named "GuitarCenterBot"
+COPY GuitarCenterBot/GuitarCenterBot.csproj GuitarCenterBot/
+RUN dotnet restore GuitarCenterBot/GuitarCenterBot.csproj
 
 # Copy the rest of the code and build the application
-COPY . ./
+COPY GuitarCenterBot/ GuitarCenterBot/
+WORKDIR /src/GuitarCenterBot
 RUN dotnet publish -c Release -o /app/publish
 
 # Use the official ASP.NET Core runtime image to run the app
@@ -19,4 +21,4 @@ COPY --from=build /app/publish .
 EXPOSE 8080
 
 # Start the application
-ENTRYPOINT ["dotnet", "GuitarCenterBot.dll"]
+ENTRYPOINT["dotnet", "GuitarCenterBot.dll"]
