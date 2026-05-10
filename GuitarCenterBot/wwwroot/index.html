@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GC Scraper Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --surface-color: #1e293b;
+            --surface-hover: #334155;
+            --primary-color: #ef4444;
+            --primary-hover: #dc2626;
+            --success-color: #10b981;
+            --success-hover: #059669;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --border-color: #334155;
+            --sidebar-width: 250px;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 0;
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Navbar */
+        .navbar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 60px;
+            background-color: var(--surface-color);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            padding: 0 20px;
+            z-index: 1000;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        .hamburger {
+            background: none;
+            border: none;
+            color: var(--text-main);
+            font-size: 24px;
+            cursor: pointer;
+            margin-right: 20px;
+            transition: color 0.2s;
+        }
+
+        .hamburger:hover {
+            color: var(--primary-color);
+        }
+
+        .brand {
+            font-size: 20px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            position: fixed;
+            top: 60px;
+            left: calc(-1 * var(--sidebar-width));
+            width: var(--sidebar-width);
+            height: calc(100vh - 60px);
+            background-color: var(--surface-color);
+            border-right: 1px solid var(--border-color);
+            transition: left 0.3s ease;
+            z-index: 999;
+            display: flex;
+            flex-direction: column;
+            padding-top: 20px;
+        }
+
+        .sidebar.open {
+            left: 0;
+        }
+
+        .sidebar a {
+            color: var(--text-muted);
+            text-decoration: none;
+            padding: 15px 25px;
+            font-size: 16px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            transition: all 0.2s;
+            border-left: 3px solid transparent;
+        }
+
+        .sidebar a:hover, .sidebar a.active {
+            color: var(--text-main);
+            background-color: var(--surface-hover);
+            border-left-color: var(--primary-color);
+        }
+
+        /* Main Content */
+        .main-content {
+            margin-top: 60px;
+            padding: 40px;
+            flex-grow: 1;
+            transition: margin-left 0.3s ease;
+            overflow-y: auto;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .main-content.shifted {
+            margin-left: var(--sidebar-width);
+        }
+
+        .tab-content {
+            display: none;
+            max-width: 800px;
+            margin: 0 auto;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Cards & Forms */
+        .card {
+            background-color: var(--surface-color);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+
+        .card h2 {
+            margin-top: 0;
+            margin-bottom: 25px;
+            font-size: 22px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 15px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: var(--text-muted);
+            font-size: 14px;
+        }
+
+        input[type="text"], input[type="number"] {
+            width: 100%;
+            padding: 12px 15px;
+            background-color: var(--bg-color);
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+            border-radius: 8px;
+            box-sizing: border-box;
+            font-size: 15px;
+            transition: border-color 0.2s, box-shadow 0.2s;
+            font-family: 'Inter', sans-serif;
+        }
+
+        input[type="text"]:focus, input[type="number"]:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.2);
+        }
+
+        /* Buttons */
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 15px;
+            color: white;
+            transition: background-color 0.2s, transform 0.1s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .btn:active {
+            transform: scale(0.98);
+        }
+
+        .btn-primary { background-color: var(--primary-color); }
+        .btn-primary:hover { background-color: var(--primary-hover); }
+        
+        .btn-success { background-color: var(--success-color); }
+        .btn-success:hover { background-color: var(--success-hover); }
+
+        .btn-danger { background-color: transparent; border: 1px solid var(--primary-color); color: var(--primary-color); }
+        .btn-danger:hover { background-color: rgba(239, 68, 68, 0.1); }
+
+        .action-buttons {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        /* Console Specific Overrides */
+        #tab-console {
+            max-width: 100%;
+            height: calc(100vh - 140px); /* Account for navbar and padding */
+        }
+
+        #tab-console.active {
+            display: flex;
+            flex-direction: column;
+        }
+
+        #tab-console .card {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            margin-bottom: 0;
+            padding: 0;
+            border: none;
+            background: transparent;
+            box-shadow: none;
+        }
+
+        .console-wrapper {
+            background: #000000;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            overflow: hidden;
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .console-header {
+            background: #1a1a1a;
+            padding: 10px 15px;
+            border-bottom: 1px solid #333;
+            display: flex;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+
+        .console-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+        .dot-red { background-color: #ff5f56; }
+        .dot-yellow { background-color: #ffbd2e; }
+        .dot-green { background-color: #27c93f; }
+
+        .console-output {
+            color: #4ade80;
+            padding: 20px;
+            flex-grow: 1;
+            height: 0; /* Let flexbox manage the height */
+            overflow-y: auto;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 14px;
+            line-height: 1.5;
+            white-space: pre-wrap;
+            margin: 0;
+        }
+
+        /* Scrollbar styling */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: var(--bg-color); }
+        ::-webkit-scrollbar-thumb { background: var(--surface-hover); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+        /* Toast Notifications */
+        #toast-container {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .toast {
+            background-color: var(--surface-color);
+            color: var(--text-main);
+            border-left: 4px solid var(--primary-color);
+            padding: 15px 20px;
+            border-radius: 6px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            min-width: 250px;
+            font-weight: 600;
+            font-size: 14px;
+            animation: slideInRight 0.3s ease, fadeOut 0.3s ease 2.7s forwards;
+        }
+
+        .toast.success { border-left-color: var(--success-color); }
+        .toast.error { border-left-color: var(--primary-color); }
+
+        @keyframes slideInRight {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        @keyframes fadeOut {
+            to { opacity: 0; }
+        }
+
+        /* Custom Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.6);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+            backdrop-filter: blur(2px);
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal {
+            background: var(--surface-color);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 25px;
+            max-width: 400px;
+            width: 90%;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+            animation: fadeIn 0.2s ease;
+        }
+
+        .modal h3 {
+            margin-top: 0;
+            margin-bottom: 15px;
+            color: var(--text-main);
+        }
+
+        .modal p {
+            color: var(--text-muted);
+            line-height: 1.5;
+            margin-bottom: 25px;
+        }
+
+        .modal-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+
+        @media (max-width: 768px) {
+            .main-content.shifted { margin-left: 0; }
+            .sidebar { box-shadow: 5px 0 15px rgba(0,0,0,0.5); }
+            #tab-console { height: calc(100vh - 120px); padding: 20px; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Top Navbar -->
+    <nav class="navbar">
+        <button class="hamburger" onclick="toggleMenu()">☰</button>
+        <div class="brand">🎸 GC Scraper Dashboard</div>
+    </nav>
+
+    <!-- Sidebar -->
+    <div class="sidebar" id="sidebar">
+        <a href="#" class="active" onclick="showTab('tab-config', this)">⚙️ Configuration</a>
+        <a href="#" onclick="showTab('tab-actions', this)">🚀 Actions</a>
+        <a href="#" onclick="showTab('tab-console', this)">💻 Console Output</a>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content" id="main-content">
+        
+        <!-- Configuration Tab -->
+        <div id="tab-config" class="tab-content active">
+            <div class="card">
+                <h2>Bot Configuration</h2>
+                <div class="form-group">
+                    <label>Telegram Bot Token</label>
+                    <input type="text" id="botToken" placeholder="e.g. 123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11">
+                </div>
+                <div class="form-group">
+                    <label>Telegram Chat ID</label>
+                    <input type="text" id="chatId" placeholder="e.g. -100123456789">
+                </div>
+                <div class="form-group">
+                    <label>Search URL</label>
+                    <input type="text" id="searchUrl" placeholder="https://www.guitarcenter.com/search?Ntt=...">
+                </div>
+                <div class="form-group">
+                    <label>Keyword Filter (Must be in title)</label>
+                    <input type="text" id="keyword" placeholder="e.g. classic">
+                </div>
+                <div class="form-group">
+                    <label>Scrape Interval (Hours)</label>
+                    <input type="number" id="intervalHours" step="0.1" placeholder="12">
+                </div>
+                <button class="btn btn-primary" onclick="saveConfig()">💾 Save Configuration</button>
+            </div>
+        </div>
+
+        <!-- Actions Tab -->
+        <div id="tab-actions" class="tab-content">
+            <div class="card">
+                <h2>Manual Actions</h2>
+                <p style="color: var(--text-muted); margin-bottom: 25px; line-height: 1.6;">
+                    Use the controls below to manually interact with the scraper. Running a manual scrape will not interrupt the background schedule, but it will prevent overlapping scrapes.
+                </p>
+                <div class="action-buttons">
+                    <button class="btn btn-success" onclick="runScrape()">▶ Run Scrape Now</button>
+                    <button class="btn btn-danger" onclick="confirmClearCache()">🗑 Clear Cache</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Console Tab -->
+        <div id="tab-console" class="tab-content">
+            <div class="card">
+                <div class="console-wrapper">
+                    <div class="console-header">
+                        <div class="console-dot dot-red"></div>
+                        <div class="console-dot dot-yellow"></div>
+                        <div class="console-dot dot-green"></div>
+                    </div>
+                    <pre class="console-output" id="consoleOutput">Loading logs...</pre>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Toast Container -->
+    <div id="toast-container"></div>
+
+    <!-- Custom Confirm Modal -->
+    <div class="modal-overlay" id="confirm-modal">
+        <div class="modal">
+            <h3>⚠️ Confirm Action</h3>
+            <p id="confirm-message">Are you sure you want to proceed?</p>
+            <div class="modal-actions">
+                <button class="btn" id="confirm-no" style="background: var(--surface-hover);">Cancel</button>
+                <button class="btn btn-primary" id="confirm-yes">Confirm</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // UI Logic
+        const sidebar = document.getElementById('sidebar');
+        const mainContent = document.getElementById('main-content');
+
+        // Open sidebar by default on larger screens
+        if (window.innerWidth > 768) {
+            sidebar.classList.add('open');
+            mainContent.classList.add('shifted');
+        }
+
+        function toggleMenu() {
+            sidebar.classList.toggle('open');
+            if (window.innerWidth > 768) {
+                mainContent.classList.toggle('shifted');
+            }
+        }
+
+        function showTab(tabId, element) {
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            // Remove active class from all links
+            document.querySelectorAll('.sidebar a').forEach(link => {
+                link.classList.remove('active');
+            });
+            
+            // Show selected tab and set active link
+            document.getElementById(tabId).classList.add('active');
+            element.classList.add('active');
+
+            // Close sidebar on mobile after selection
+            if (window.innerWidth <= 768) {
+                sidebar.classList.remove('open');
+            }
+        }
+
+        // Toast Notification Logic
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            
+            // Add icon based on type
+            const icon = type === 'success' ? '✅' : '⚠️';
+            toast.innerHTML = `<span>${icon}</span> <span>${message}</span>`;
+            
+            container.appendChild(toast);
+            
+            // Remove toast after animation completes (3s)
+            setTimeout(() => {
+                toast.remove();
+            }, 3000);
+        }
+
+        // Custom Confirm Modal Logic
+        function showConfirm(message, onConfirm) {
+            const overlay = document.getElementById('confirm-modal');
+            document.getElementById('confirm-message').textContent = message;
+            overlay.classList.add('active');
+            
+            const btnYes = document.getElementById('confirm-yes');
+            const btnNo = document.getElementById('confirm-no');
+            
+            // Clear previous event listeners by cloning and replacing nodes
+            const newBtnYes = btnYes.cloneNode(true);
+            const newBtnNo = btnNo.cloneNode(true);
+            btnYes.parentNode.replaceChild(newBtnYes, btnYes);
+            btnNo.parentNode.replaceChild(newBtnNo, btnNo);
+
+            newBtnYes.onclick = () => {
+                overlay.classList.remove('active');
+                onConfirm();
+            };
+            
+            newBtnNo.onclick = () => {
+                overlay.classList.remove('active');
+            };
+        }
+
+        // API Logic
+        fetch('/api/config')
+            .then(res => res.json())
+            .then(data => {
+                document.getElementById('botToken').value = data.botToken;
+                document.getElementById('chatId').value = data.chatId;
+                document.getElementById('searchUrl').value = data.searchUrl;
+                document.getElementById('keyword').value = data.keyword;
+                document.getElementById('intervalHours').value = data.intervalHours;
+            });
+
+        function saveConfig() {
+            const config = {
+                botToken: document.getElementById('botToken').value,
+                chatId: document.getElementById('chatId').value,
+                searchUrl: document.getElementById('searchUrl').value,
+                keyword: document.getElementById('keyword').value,
+                intervalHours: parseFloat(document.getElementById('intervalHours').value)
+            };
+
+            fetch('/api/config', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(config)
+            }).then(() => showToast('Configuration saved successfully!', 'success'));
+        }
+
+        function runScrape() {
+            fetch('/api/scrape', { method: 'POST' })
+                .then(() => {
+                    showToast('Scrape started! Switching to Console Output.', 'success');
+                    // Automatically switch to console tab
+                    const consoleLink = document.querySelector('.sidebar a:nth-child(3)');
+                    showTab('tab-console', consoleLink);
+                });
+        }
+
+        function confirmClearCache() {
+            showConfirm("Are you sure you want to clear the cache? The bot will re-send all items currently on the search page.", () => {
+                fetch('/api/clearcache', { method: 'POST' })
+                    .then(() => showToast('Cache cleared successfully!', 'success'));
+            });
+        }
+
+        // Poll logs every 2 seconds
+        setInterval(() => {
+            fetch('/api/logs')
+                .then(res => res.json())
+                .then(logs => {
+                    const consoleDiv = document.getElementById('consoleOutput');
+                    const isScrolledToBottom = consoleDiv.scrollHeight - consoleDiv.clientHeight <= consoleDiv.scrollTop + 10;
+                    
+                    consoleDiv.textContent = logs.join('\n');
+                    
+                    // Auto-scroll to bottom if user hasn't scrolled up manually
+                    if (isScrolledToBottom) {
+                        consoleDiv.scrollTop = consoleDiv.scrollHeight;
+                    }
+                });
+        }, 2000);
+    </script>
+
+</body>
+</html>
