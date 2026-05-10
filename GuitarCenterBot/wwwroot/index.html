@@ -237,6 +237,7 @@
             justify-content: center;
             gap: 8px;
             font-family: 'Inter', sans-serif;
+            white-space: nowrap;
         }
 
             .btn:disabled {
@@ -321,18 +322,26 @@
             padding: 12px 15px;
             text-align: left;
             border-bottom: 1px solid var(--border-color);
-            word-break: break-all;
+            vertical-align: middle;
         }
+
+            /* Prevent wrapping on headers, Item ID, URL, and Actions */
+            th,
+            td:nth-child(1),
+            td:nth-child(2),
+            td.actions-cell {
+                white-space: nowrap;
+            }
+
+            /* Allow Message IDs to wrap, but break nicely */
+            td:nth-child(3) {
+                white-space: normal;
+                word-break: break-word;
+                min-width: 120px;
+            }
 
         tbody tr {
             transition: opacity 0.3s ease-out;
-        }
-
-        td.actions-cell {
-            display: flex;
-            gap: 8px;
-            align-items: center;
-            flex-wrap: wrap;
         }
 
         th {
