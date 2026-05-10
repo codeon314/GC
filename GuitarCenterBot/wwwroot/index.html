@@ -57,9 +57,9 @@
             transition: color 0.2s;
         }
 
-        .hamburger:hover {
-            color: var(--primary-color);
-        }
+            .hamburger:hover {
+                color: var(--primary-color);
+            }
 
         .brand {
             font-size: 20px;
@@ -86,28 +86,28 @@
             padding-top: 20px;
         }
 
-        .sidebar.open {
-            left: 0;
-        }
+            .sidebar.open {
+                left: 0;
+            }
 
-        .sidebar a {
-            color: var(--text-muted);
-            text-decoration: none;
-            padding: 15px 25px;
-            font-size: 16px;
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            transition: all 0.2s;
-            border-left: 3px solid transparent;
-        }
+            .sidebar a {
+                color: var(--text-muted);
+                text-decoration: none;
+                padding: 15px 25px;
+                font-size: 16px;
+                font-weight: 600;
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                transition: all 0.2s;
+                border-left: 3px solid transparent;
+            }
 
-        .sidebar a:hover, .sidebar a.active {
-            color: var(--text-main);
-            background-color: var(--surface-hover);
-            border-left-color: var(--primary-color);
-        }
+                .sidebar a:hover, .sidebar a.active {
+                    color: var(--text-main);
+                    background-color: var(--surface-hover);
+                    border-left-color: var(--primary-color);
+                }
 
         /* Main Content */
         .main-content {
@@ -120,24 +120,31 @@
             box-sizing: border-box;
         }
 
-        .main-content.shifted {
-            margin-left: var(--sidebar-width);
-        }
+            .main-content.shifted {
+                margin-left: var(--sidebar-width);
+            }
 
         .tab-content {
             display: none;
-            max-width: 800px;
+            max-width: 1000px;
             margin: 0 auto;
             animation: fadeIn 0.3s ease;
         }
 
-        .tab-content.active {
-            display: block;
-        }
+            .tab-content.active {
+                display: block;
+            }
 
         @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
 
         /* Cards & Forms */
@@ -150,13 +157,13 @@
             margin-bottom: 20px;
         }
 
-        .card h2 {
-            margin-top: 0;
-            margin-bottom: 25px;
-            font-size: 22px;
-            border-bottom: 1px solid var(--border-color);
-            padding-bottom: 15px;
-        }
+            .card h2 {
+                margin-top: 0;
+                margin-bottom: 25px;
+                font-size: 22px;
+                border-bottom: 1px solid var(--border-color);
+                padding-bottom: 15px;
+            }
 
         .form-group {
             margin-bottom: 20px;
@@ -170,7 +177,13 @@
             font-size: 14px;
         }
 
-        input[type="text"], input[type="number"] {
+        .input-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        input[type="text"], input[type="number"], input[type="password"] {
             width: 100%;
             padding: 12px 15px;
             background-color: var(--bg-color);
@@ -183,7 +196,26 @@
             font-family: 'Inter', sans-serif;
         }
 
-        input[type="text"]:focus, input[type="number"]:focus {
+        .input-wrapper input {
+            padding-right: 45px;
+        }
+
+        .toggle-password {
+            position: absolute;
+            right: 10px;
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 18px;
+            padding: 5px;
+        }
+
+            .toggle-password:hover {
+                color: var(--text-main);
+            }
+
+        input:focus {
             outline: none;
             border-color: var(--primary-color);
             box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.2);
@@ -205,18 +237,40 @@
             font-family: 'Inter', sans-serif;
         }
 
-        .btn:active {
-            transform: scale(0.98);
+            .btn:active {
+                transform: scale(0.98);
+            }
+
+        .btn-sm {
+            padding: 6px 12px;
+            font-size: 13px;
         }
 
-        .btn-primary { background-color: var(--primary-color); }
-        .btn-primary:hover { background-color: var(--primary-hover); }
-        
-        .btn-success { background-color: var(--success-color); }
-        .btn-success:hover { background-color: var(--success-hover); }
+        .btn-primary {
+            background-color: var(--primary-color);
+        }
 
-        .btn-danger { background-color: transparent; border: 1px solid var(--primary-color); color: var(--primary-color); }
-        .btn-danger:hover { background-color: rgba(239, 68, 68, 0.1); }
+            .btn-primary:hover {
+                background-color: var(--primary-hover);
+            }
+
+        .btn-success {
+            background-color: var(--success-color);
+        }
+
+            .btn-success:hover {
+                background-color: var(--success-hover);
+            }
+
+        .btn-danger {
+            background-color: transparent;
+            border: 1px solid var(--primary-color);
+            color: var(--primary-color);
+        }
+
+            .btn-danger:hover {
+                background-color: rgba(239, 68, 68, 0.1);
+            }
 
         .action-buttons {
             display: flex;
@@ -224,27 +278,61 @@
             flex-wrap: wrap;
         }
 
+        /* Table */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+
+        th, td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        th {
+            background-color: var(--bg-color);
+            color: var(--text-muted);
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        td {
+            font-size: 14px;
+            color: var(--text-main);
+        }
+
+            td a {
+                color: #60a5fa;
+                text-decoration: none;
+            }
+
+                td a:hover {
+                    text-decoration: underline;
+                }
+
         /* Console Specific Overrides */
         #tab-console {
             max-width: 100%;
-            height: calc(100vh - 140px); /* Account for navbar and padding */
+            height: calc(100vh - 140px);
         }
 
-        #tab-console.active {
-            display: flex;
-            flex-direction: column;
-        }
+            #tab-console.active {
+                display: flex;
+                flex-direction: column;
+            }
 
-        #tab-console .card {
-            flex-grow: 1;
-            display: flex;
-            flex-direction: column;
-            margin-bottom: 0;
-            padding: 0;
-            border: none;
-            background: transparent;
-            box-shadow: none;
-        }
+            #tab-console .card {
+                flex-grow: 1;
+                display: flex;
+                flex-direction: column;
+                margin-bottom: 0;
+                padding: 0;
+                border: none;
+                background: transparent;
+                box-shadow: none;
+            }
 
         .console-wrapper {
             background: #000000;
@@ -270,15 +358,24 @@
             height: 12px;
             border-radius: 50%;
         }
-        .dot-red { background-color: #ff5f56; }
-        .dot-yellow { background-color: #ffbd2e; }
-        .dot-green { background-color: #27c93f; }
+
+        .dot-red {
+            background-color: #ff5f56;
+        }
+
+        .dot-yellow {
+            background-color: #ffbd2e;
+        }
+
+        .dot-green {
+            background-color: #27c93f;
+        }
 
         .console-output {
             color: #4ade80;
             padding: 20px;
             flex-grow: 1;
-            height: 0; /* Let flexbox manage the height */
+            height: 0;
             overflow-y: auto;
             font-family: 'Courier New', Courier, monospace;
             font-size: 14px;
@@ -288,10 +385,23 @@
         }
 
         /* Scrollbar styling */
-        ::-webkit-scrollbar { width: 8px; }
-        ::-webkit-scrollbar-track { background: var(--bg-color); }
-        ::-webkit-scrollbar-thumb { background: var(--surface-hover); border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg-color);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--surface-hover);
+            border-radius: 4px;
+        }
+
+            ::-webkit-scrollbar-thumb:hover {
+                background: var(--text-muted);
+            }
 
         /* Toast Notifications */
         #toast-container {
@@ -320,22 +430,39 @@
             animation: slideInRight 0.3s ease, fadeOut 0.3s ease 2.7s forwards;
         }
 
-        .toast.success { border-left-color: var(--success-color); }
-        .toast.error { border-left-color: var(--primary-color); }
+            .toast.success {
+                border-left-color: var(--success-color);
+            }
+
+            .toast.error {
+                border-left-color: var(--primary-color);
+            }
 
         @keyframes slideInRight {
-            from { transform: translateX(100%); opacity: 0; }
-            to { transform: translateX(0); opacity: 1; }
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
         }
 
         @keyframes fadeOut {
-            to { opacity: 0; }
+            to {
+                opacity: 0;
+            }
         }
 
         /* Custom Modal */
         .modal-overlay {
             position: fixed;
-            top: 0; left: 0; right: 0; bottom: 0;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
             background: rgba(0,0,0,0.6);
             display: none;
             align-items: center;
@@ -344,9 +471,9 @@
             backdrop-filter: blur(2px);
         }
 
-        .modal-overlay.active {
-            display: flex;
-        }
+            .modal-overlay.active {
+                display: flex;
+            }
 
         .modal {
             background: var(--surface-color);
@@ -359,17 +486,17 @@
             animation: fadeIn 0.2s ease;
         }
 
-        .modal h3 {
-            margin-top: 0;
-            margin-bottom: 15px;
-            color: var(--text-main);
-        }
+            .modal h3 {
+                margin-top: 0;
+                margin-bottom: 15px;
+                color: var(--text-main);
+            }
 
-        .modal p {
-            color: var(--text-muted);
-            line-height: 1.5;
-            margin-bottom: 25px;
-        }
+            .modal p {
+                color: var(--text-muted);
+                line-height: 1.5;
+                margin-bottom: 25px;
+            }
 
         .modal-actions {
             display: flex;
@@ -378,9 +505,18 @@
         }
 
         @media (max-width: 768px) {
-            .main-content.shifted { margin-left: 0; }
-            .sidebar { box-shadow: 5px 0 15px rgba(0,0,0,0.5); }
-            #tab-console { height: calc(100vh - 120px); padding: 20px; }
+            .main-content.shifted {
+                margin-left: 0;
+            }
+
+            .sidebar {
+                box-shadow: 5px 0 15px rgba(0,0,0,0.5);
+            }
+
+            #tab-console {
+                height: calc(100vh - 120px);
+                padding: 20px;
+            }
         }
     </style>
 </head>
@@ -396,23 +532,30 @@
     <div class="sidebar" id="sidebar">
         <a href="#" class="active" onclick="showTab('tab-config', this)">⚙️ Configuration</a>
         <a href="#" onclick="showTab('tab-actions', this)">🚀 Actions</a>
+        <a href="#" onclick="showTab('tab-cache', this); loadCache();">🗄️ Cache Database</a>
         <a href="#" onclick="showTab('tab-console', this)">💻 Console Output</a>
     </div>
 
     <!-- Main Content -->
     <div class="main-content" id="main-content">
-        
+
         <!-- Configuration Tab -->
         <div id="tab-config" class="tab-content active">
             <div class="card">
                 <h2>Bot Configuration</h2>
                 <div class="form-group">
                     <label>Telegram Bot Token</label>
-                    <input type="text" id="botToken" placeholder="e.g. 123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11">
+                    <div class="input-wrapper">
+                        <input type="password" id="botToken" placeholder="e.g. 123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11">
+                        <button class="toggle-password" onclick="togglePassword('botToken')">👁️</button>
+                    </div>
                 </div>
                 <div class="form-group">
                     <label>Telegram Chat ID</label>
-                    <input type="text" id="chatId" placeholder="e.g. -100123456789">
+                    <div class="input-wrapper">
+                        <input type="password" id="chatId" placeholder="e.g. -100123456789">
+                        <button class="toggle-password" onclick="togglePassword('chatId')">👁️</button>
+                    </div>
                 </div>
                 <div class="form-group">
                     <label>Search URL</label>
@@ -439,7 +582,35 @@
                 </p>
                 <div class="action-buttons">
                     <button class="btn btn-success" onclick="runScrape()">▶ Run Scrape Now</button>
-                    <button class="btn btn-danger" onclick="confirmClearCache()">🗑 Clear Cache</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Cache Database Tab -->
+        <div id="tab-cache" class="tab-content">
+            <div class="card">
+                <h2>Cache Database</h2>
+                <p style="color: var(--text-muted); margin-bottom: 20px; font-size: 14px;">
+                    These items have been successfully posted to Telegram. Deleting an item here will also attempt to delete its corresponding messages from the Telegram channel.
+                </p>
+                <div class="action-buttons" style="margin-bottom: 20px;">
+                    <button class="btn btn-danger" onclick="confirmClearCache()">🗑 Clear All Cache & Messages</button>
+                    <button class="btn btn-success" onclick="loadCache()">🔄 Refresh Table</button>
+                </div>
+                <div style="overflow-x: auto;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Item ID</th>
+                                <th>URL</th>
+                                <th>Message IDs</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="cacheTableBody">
+                            <tr><td colspan="4" style="text-align: center;">Loading cache...</td></tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
@@ -480,7 +651,6 @@
         const sidebar = document.getElementById('sidebar');
         const mainContent = document.getElementById('main-content');
 
-        // Open sidebar by default on larger screens
         if (window.innerWidth > 768) {
             sidebar.classList.add('open');
             mainContent.classList.add('shifted');
@@ -494,53 +664,48 @@
         }
 
         function showTab(tabId, element) {
-            // Hide all tabs
             document.querySelectorAll('.tab-content').forEach(tab => {
                 tab.classList.remove('active');
             });
-            // Remove active class from all links
             document.querySelectorAll('.sidebar a').forEach(link => {
                 link.classList.remove('active');
             });
-            
-            // Show selected tab and set active link
+
             document.getElementById(tabId).classList.add('active');
             element.classList.add('active');
 
-            // Close sidebar on mobile after selection
             if (window.innerWidth <= 768) {
                 sidebar.classList.remove('open');
             }
         }
 
-        // Toast Notification Logic
+        function togglePassword(inputId) {
+            const input = document.getElementById(inputId);
+            if (input.type === "password") {
+                input.type = "text";
+            } else {
+                input.type = "password";
+            }
+        }
+
         function showToast(message, type = 'success') {
             const container = document.getElementById('toast-container');
             const toast = document.createElement('div');
             toast.className = `toast ${type}`;
-            
-            // Add icon based on type
             const icon = type === 'success' ? '✅' : '⚠️';
             toast.innerHTML = `<span>${icon}</span> <span>${message}</span>`;
-            
             container.appendChild(toast);
-            
-            // Remove toast after animation completes (3s)
-            setTimeout(() => {
-                toast.remove();
-            }, 3000);
+            setTimeout(() => { toast.remove(); }, 3000);
         }
 
-        // Custom Confirm Modal Logic
         function showConfirm(message, onConfirm) {
             const overlay = document.getElementById('confirm-modal');
             document.getElementById('confirm-message').textContent = message;
             overlay.classList.add('active');
-            
+
             const btnYes = document.getElementById('confirm-yes');
             const btnNo = document.getElementById('confirm-no');
-            
-            // Clear previous event listeners by cloning and replacing nodes
+
             const newBtnYes = btnYes.cloneNode(true);
             const newBtnNo = btnNo.cloneNode(true);
             btnYes.parentNode.replaceChild(newBtnYes, btnYes);
@@ -550,7 +715,7 @@
                 overlay.classList.remove('active');
                 onConfirm();
             };
-            
+
             newBtnNo.onclick = () => {
                 overlay.classList.remove('active');
             };
@@ -587,16 +752,55 @@
             fetch('/api/scrape', { method: 'POST' })
                 .then(() => {
                     showToast('Scrape started! Switching to Console Output.', 'success');
-                    // Automatically switch to console tab
-                    const consoleLink = document.querySelector('.sidebar a:nth-child(3)');
+                    const consoleLink = document.querySelector('.sidebar a:nth-child(4)');
                     showTab('tab-console', consoleLink);
                 });
         }
 
+        function loadCache() {
+            fetch('/api/cache')
+                .then(res => res.json())
+                .then(data => {
+                    const tbody = document.getElementById('cacheTableBody');
+                    tbody.innerHTML = '';
+
+                    if (data.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--text-muted);">Cache is empty.</td></tr>';
+                        return;
+                    }
+
+                    data.forEach(item => {
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `
+                            <td>${item.itemId}</td>
+                            <td><a href="${item.url}" target="_blank" title="${item.url}">Link</a></td>
+                            <td>${item.messageIds.join(', ')}</td>
+                            <td>
+                                <button class="btn btn-danger btn-sm" onclick="deleteCacheItem('${item.itemId}')">Delete</button>
+                            </td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+                });
+        }
+
+        function deleteCacheItem(itemId) {
+            showConfirm(`Are you sure you want to delete item ${itemId}? This will also delete the message from Telegram.`, () => {
+                fetch(`/api/cache/${itemId}`, { method: 'DELETE' })
+                    .then(() => {
+                        showToast(`Item ${itemId} deleted.`, 'success');
+                        loadCache();
+                    });
+            });
+        }
+
         function confirmClearCache() {
-            showConfirm("Are you sure you want to clear the cache? The bot will re-send all items currently on the search page.", () => {
+            showConfirm("Are you sure you want to clear the entire cache? The bot will delete ALL associated messages from Telegram and re-send items currently on the search page.", () => {
                 fetch('/api/clearcache', { method: 'POST' })
-                    .then(() => showToast('Cache cleared successfully!', 'success'));
+                    .then(() => {
+                        showToast('Cache cleared and messages deleted successfully!', 'success');
+                        loadCache();
+                    });
             });
         }
 
@@ -607,10 +811,9 @@
                 .then(logs => {
                     const consoleDiv = document.getElementById('consoleOutput');
                     const isScrolledToBottom = consoleDiv.scrollHeight - consoleDiv.clientHeight <= consoleDiv.scrollTop + 10;
-                    
+
                     consoleDiv.textContent = logs.join('\n');
-                    
-                    // Auto-scroll to bottom if user hasn't scrolled up manually
+
                     if (isScrolledToBottom) {
                         consoleDiv.scrollTop = consoleDiv.scrollHeight;
                     }

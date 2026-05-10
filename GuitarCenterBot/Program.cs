@@ -20,7 +20,7 @@ using Telegram.Bot.Types;
 namespace GuitarCenterBot
 {
     // ==========================================
-    // CONFIGURATION MODEL
+    // MODELS
     // ==========================================
     public class AppConfig
     {
@@ -29,6 +29,13 @@ namespace GuitarCenterBot
         public string SearchUrl { get; set; } = "https://www.guitarcenter.com/search?Ntt=schecter%20c1%20classic";
         public string Keyword { get; set; } = "classic";
         public double IntervalHours { get; set; } = 12.0;
+    }
+
+    public class CacheItem
+    {
+        public string ItemId { get; set; } = "";
+        public string Url { get; set; } = "";
+        public List<int> MessageIds { get; set; } = new();
     }
 
     // ==========================================
@@ -58,9 +65,20 @@ namespace GuitarCenterBot
     // ==========================================
     public class ScraperService
     {
-        private readonly string _cacheFilePath = "cache.txt";
+        private readonly string _cacheFilePath = "cache.json";
         private readonly string _configFilePath = "config.json";
         private readonly SemaphoreSlim _scrapeLock = new(1, 1);
+
+        // Shared HttpClient to prevent socket exhaustion and save CPU/RAM
+        private static readonly HttpClient _httpClient = new HttpClient();
+
+        public ScraperService()
+        {
+            if (!_httpClient.DefaultRequestHeaders.Contains("User-Agent"))
+            {
+                _httpClient.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36");
+            }
+        }
 
         public AppConfig GetConfig()
         {
@@ -81,18 +99,146 @@ namespace GuitarCenterBot
             MemoryLogger.Log("Configuration saved successfully.");
         }
 
-        public void ClearCache()
+        public Dictionary<string, CacheItem> GetCache()
         {
+            if (!System.IO.File.Exists(_cacheFilePath))
+            {
+                return new Dictionary<string, CacheItem>();
+            }
+            try
+            {
+                string json = System.IO.File.ReadAllText(_cacheFilePath);
+                return JsonSerializer.Deserialize<Dictionary<string, CacheItem>>(json) ?? new Dictionary<string, CacheItem>();
+            }
+            catch
+            {
+                return new Dictionary<string, CacheItem>();
+            }
+        }
+
+        public void SaveCache(Dictionary<string, CacheItem> cache)
+        {
+            string json = JsonSerializer.Serialize(cache, new JsonSerializerOptions { WriteIndented = true });
+            System.IO.File.WriteAllText(_cacheFilePath, json);
+        }
+
+        public async Task ClearCacheAsync()
+        {
+            var config = GetConfig();
+            var cache = GetCache();
+
+            if (!string.IsNullOrWhiteSpace(config.BotToken) && !string.IsNullOrWhiteSpace(config.ChatId))
+            {
+                var botClient = new TelegramBotClient(config.BotToken);
+                MemoryLogger.Log("Deleting all cached messages from Telegram...");
+
+                foreach (var item in cache.Values)
+                {
+                    foreach (var msgId in item.MessageIds)
+                    {
+                        try
+                        {
+                            await botClient.DeleteMessageAsync(config.ChatId, msgId);
+                            await Task.Delay(100); // Prevent rate limiting
+                        }
+                        catch { /* Ignore if message already deleted or not found */ }
+                    }
+                }
+            }
+
             if (System.IO.File.Exists(_cacheFilePath))
             {
                 System.IO.File.Delete(_cacheFilePath);
             }
-            MemoryLogger.Log("Cache cleared successfully.");
+            MemoryLogger.Log("Cache cleared and Telegram messages deleted successfully.");
+        }
+
+        public async Task DeleteCacheItemAsync(string itemId)
+        {
+            var config = GetConfig();
+            var cache = GetCache();
+
+            if (cache.TryGetValue(itemId, out var item))
+            {
+                if (!string.IsNullOrWhiteSpace(config.BotToken) && !string.IsNullOrWhiteSpace(config.ChatId))
+                {
+                    var botClient = new TelegramBotClient(config.BotToken);
+                    foreach (var msgId in item.MessageIds)
+                    {
+                        try
+                        {
+                            await botClient.DeleteMessageAsync(config.ChatId, msgId);
+                            await Task.Delay(100);
+                        }
+                        catch { }
+                    }
+                }
+                cache.Remove(itemId);
+                SaveCache(cache);
+                MemoryLogger.Log($"Manually deleted item {itemId} from cache and Telegram.");
+            }
+        }
+
+        private async Task ValidateExistingCacheAsync(TelegramBotClient botClient, string chatId, Dictionary<string, CacheItem> cache)
+        {
+            MemoryLogger.Log("Validating existing cache entries...");
+            bool cacheUpdated = false;
+            var itemsToList = cache.Values.ToList();
+
+            foreach (var item in itemsToList)
+            {
+                try
+                {
+                    var response = await _httpClient.GetAsync(item.Url);
+
+                    if (response.StatusCode == HttpStatusCode.NotFound)
+                    {
+                        await RemoveInvalidItemAsync(botClient, chatId, cache, item, "returned 404 Not Found");
+                        cacheUpdated = true;
+                        continue;
+                    }
+
+                    string html = await response.Content.ReadAsStringAsync();
+
+                    if (html.Contains("This highly sought-after gear went quickly!") ||
+                        html.Contains("Hey, who turned down the music?"))
+                    {
+                        await RemoveInvalidItemAsync(botClient, chatId, cache, item, "is marked as sold/removed on the page");
+                        cacheUpdated = true;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    MemoryLogger.Log($"Error validating item {item.ItemId}: {ex.Message}");
+                }
+
+                await Task.Delay(500); // Be gentle on the server
+            }
+
+            if (cacheUpdated)
+            {
+                SaveCache(cache);
+            }
+            MemoryLogger.Log("Cache validation complete.");
+        }
+
+        private async Task RemoveInvalidItemAsync(TelegramBotClient botClient, string chatId, Dictionary<string, CacheItem> cache, CacheItem item, string reason)
+        {
+            MemoryLogger.Log($"Item {item.ItemId} {reason}. Removing from Telegram and cache.");
+            foreach (var msgId in item.MessageIds)
+            {
+                try
+                {
+                    await botClient.DeleteMessageAsync(chatId, msgId);
+                    await Task.Delay(100);
+                }
+                catch { }
+            }
+            cache.Remove(item.ItemId);
         }
 
         public async Task RunScrapeAsync()
         {
-            // Prevent multiple scrapes from running at the exact same time
             if (!_scrapeLock.Wait(0))
             {
                 MemoryLogger.Log("A scrape is already in progress. Skipping manual trigger.");
@@ -111,18 +257,13 @@ namespace GuitarCenterBot
 
                 MemoryLogger.Log("Starting Guitar Center Scrape...");
 
-                HashSet<string> cache = new HashSet<string>();
-                if (System.IO.File.Exists(_cacheFilePath))
-                {
-                    cache = new HashSet<string>(System.IO.File.ReadAllLines(_cacheFilePath));
-                    MemoryLogger.Log($"Loaded {cache.Count} items from cache.");
-                }
-
+                var cache = GetCache();
                 var botClient = new TelegramBotClient(config.BotToken);
 
-                using var httpClient = new HttpClient();
-                httpClient.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36");
+                // 1. Validate existing cache to remove sold items
+                await ValidateExistingCacheAsync(botClient, config.ChatId, cache);
 
+                // 2. Proceed with scraping
                 int currentPage = 1;
                 int totalMatchCount = 0;
                 bool hasMorePages = true;
@@ -136,7 +277,7 @@ namespace GuitarCenterBot
                     string htmlContent;
                     try
                     {
-                        htmlContent = await httpClient.GetStringAsync(searchUrl);
+                        htmlContent = await _httpClient.GetStringAsync(searchUrl);
                     }
                     catch (Exception ex)
                     {
@@ -194,7 +335,7 @@ namespace GuitarCenterBot
                             itemId = match.Groups[1].Value;
                         }
 
-                        if (!string.IsNullOrEmpty(itemId) && cache.Contains(itemId))
+                        if (!string.IsNullOrEmpty(itemId) && cache.ContainsKey(itemId))
                         {
                             MemoryLogger.Log($"Item {itemId} is already in cache. Skipping.");
                             continue;
@@ -204,7 +345,7 @@ namespace GuitarCenterBot
                         string listingHtml = "";
                         try
                         {
-                            listingHtml = await httpClient.GetStringAsync(link);
+                            listingHtml = await _httpClient.GetStringAsync(link);
                         }
                         catch (Exception ex)
                         {
@@ -227,7 +368,7 @@ namespace GuitarCenterBot
                             continue;
                         }
 
-                        if (cache.Contains(itemId))
+                        if (cache.ContainsKey(itemId))
                         {
                             MemoryLogger.Log($"Item {itemId} is already in cache. Skipping.");
                             continue;
@@ -280,6 +421,8 @@ namespace GuitarCenterBot
 
                         try
                         {
+                            List<int> sentMessageIds = new List<int>();
+
                             if (imageUrls.Count > 0)
                             {
                                 var mediaGroup = new List<IAlbumInputMedia>();
@@ -296,24 +439,31 @@ namespace GuitarCenterBot
                                     mediaGroup.Add(media);
                                 }
 
-                                await botClient.SendMediaGroupAsync(
+                                var messages = await botClient.SendMediaGroupAsync(
                                     chatId: config.ChatId,
                                     media: mediaGroup
                                 );
+                                sentMessageIds.AddRange(messages.Select(m => m.MessageId));
                             }
                             else
                             {
-                                await botClient.SendTextMessageAsync(
+                                var message = await botClient.SendTextMessageAsync(
                                     chatId: config.ChatId,
                                     text: caption,
                                     parseMode: Telegram.Bot.Types.Enums.ParseMode.Markdown
                                 );
+                                sentMessageIds.Add(message.MessageId);
                             }
 
                             MemoryLogger.Log("Successfully sent to Telegram.");
 
-                            cache.Add(itemId);
-                            System.IO.File.AppendAllText(_cacheFilePath, itemId + Environment.NewLine);
+                            cache[itemId] = new CacheItem
+                            {
+                                ItemId = itemId,
+                                Url = link,
+                                MessageIds = sentMessageIds
+                            };
+                            SaveCache(cache);
                         }
                         catch (Exception tgEx)
                         {
@@ -377,13 +527,12 @@ namespace GuitarCenterBot
 
                 MemoryLogger.Log($"Running scheduled scrape. Next scrape in {intervalHours} hours.");
 
-                // Run the scrape without awaiting it blocking the timer, but catch exceptions
                 _ = Task.Run(async () =>
                 {
                     await _scraperService.RunScrapeAsync();
                 }, stoppingToken);
 
-                // Wait for the configured interval
+                // Task.Delay yields the thread, consuming 0 CPU while waiting.
                 await Task.Delay(TimeSpan.FromHours(intervalHours), stoppingToken);
             }
         }
@@ -398,51 +547,47 @@ namespace GuitarCenterBot
         {
             var builder = WebApplication.CreateBuilder(args);
 
-            // Register services
             builder.Services.AddSingleton<ScraperService>();
             builder.Services.AddHostedService<BackgroundScraper>();
 
             var app = builder.Build();
 
-            // Serve static files from wwwroot (index.html)
             app.UseDefaultFiles();
             app.UseStaticFiles();
 
-            // API: Get Config
-            app.MapGet("/api/config", (ScraperService scraper) =>
-            {
-                return Results.Ok(scraper.GetConfig());
-            });
-
-            // API: Save Config
+            // Config APIs
+            app.MapGet("/api/config", (ScraperService scraper) => Results.Ok(scraper.GetConfig()));
             app.MapPost("/api/config", (AppConfig newConfig, ScraperService scraper) =>
             {
                 scraper.SaveConfig(newConfig);
                 return Results.Ok(new { message = "Configuration saved." });
             });
 
-            // API: Get Logs
-            app.MapGet("/api/logs", () =>
-            {
-                return Results.Ok(MemoryLogger.GetLogs());
-            });
+            // Logs API
+            app.MapGet("/api/logs", () => Results.Ok(MemoryLogger.GetLogs()));
 
-            // API: Trigger Manual Scrape
+            // Scrape API
             app.MapPost("/api/scrape", (ScraperService scraper) =>
             {
-                // Fire and forget so the HTTP request doesn't hang
                 _ = Task.Run(() => scraper.RunScrapeAsync());
                 return Results.Ok(new { message = "Scrape started." });
             });
 
-            // API: Clear Cache
-            app.MapPost("/api/clearcache", (ScraperService scraper) =>
+            // Cache APIs
+            app.MapGet("/api/cache", (ScraperService scraper) => Results.Ok(scraper.GetCache().Values));
+
+            app.MapDelete("/api/cache/{id}", async (string id, ScraperService scraper) =>
             {
-                scraper.ClearCache();
-                return Results.Ok(new { message = "Cache cleared." });
+                await scraper.DeleteCacheItemAsync(id);
+                return Results.Ok(new { message = "Item deleted." });
             });
 
-            // Bind to port provided by Railway or default to 8080
+            app.MapPost("/api/clearcache", async (ScraperService scraper) =>
+            {
+                await scraper.ClearCacheAsync();
+                return Results.Ok(new { message = "Cache cleared and messages deleted." });
+            });
+
             var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
             app.Urls.Add($"http://0.0.0.0:{port}");
 
