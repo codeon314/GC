@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GC Scraper Dashboard</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.0/signalr.min.js"></script>
     <style>
         :root {
             --bg-color: #0f172a;
@@ -230,14 +231,25 @@
             font-weight: 600;
             font-size: 15px;
             color: white;
-            transition: background-color 0.2s, transform 0.1s;
+            transition: background-color 0.2s, transform 0.1s, opacity 0.2s;
             display: inline-flex;
             align-items: center;
+            justify-content: center;
             gap: 8px;
             font-family: 'Inter', sans-serif;
         }
 
-            .btn:active {
+            .btn:disabled {
+                opacity: 0.5;
+                cursor: not-allowed;
+                transform: none;
+            }
+
+            .btn + .btn {
+                margin-left: 8px;
+            }
+
+            .btn:active:not(:disabled) {
                 transform: scale(0.98);
             }
 
@@ -250,15 +262,23 @@
             background-color: var(--primary-color);
         }
 
-            .btn-primary:hover {
+            .btn-primary:hover:not(:disabled) {
                 background-color: var(--primary-hover);
+            }
+
+        .btn-secondary {
+            background-color: #4f46e5;
+        }
+
+            .btn-secondary:hover:not(:disabled) {
+                background-color: #4338ca;
             }
 
         .btn-success {
             background-color: var(--success-color);
         }
 
-            .btn-success:hover {
+            .btn-success:hover:not(:disabled) {
                 background-color: var(--success-hover);
             }
 
@@ -268,7 +288,7 @@
             color: var(--primary-color);
         }
 
-            .btn-danger:hover {
+            .btn-danger:hover:not(:disabled) {
                 background-color: rgba(239, 68, 68, 0.1);
             }
 
@@ -276,6 +296,18 @@
             display: flex;
             gap: 15px;
             flex-wrap: wrap;
+        }
+
+        .spinner {
+            animation: spin 1s linear infinite;
+            width: 1em;
+            height: 1em;
+        }
+
+        @keyframes spin {
+            100% {
+                transform: rotate(360deg);
+            }
         }
 
         /* Table */
@@ -289,6 +321,18 @@
             padding: 12px 15px;
             text-align: left;
             border-bottom: 1px solid var(--border-color);
+            word-break: break-all;
+        }
+
+        tbody tr {
+            transition: opacity 0.3s ease-out;
+        }
+
+        td.actions-cell {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
         }
 
         th {
@@ -480,7 +524,7 @@
             border: 1px solid var(--border-color);
             border-radius: 12px;
             padding: 25px;
-            max-width: 400px;
+            max-width: 500px;
             width: 90%;
             box-shadow: 0 10px 25px rgba(0,0,0,0.5);
             animation: fadeIn 0.2s ease;
@@ -505,9 +549,13 @@
         }
 
         @media (max-width: 768px) {
-            .main-content.shifted {
-                margin-left: 0;
+            .main-content {
+                padding: 20px;
             }
+
+                .main-content.shifted {
+                    margin-left: 0;
+                }
 
             .sidebar {
                 box-shadow: 5px 0 15px rgba(0,0,0,0.5);
@@ -515,12 +563,28 @@
 
             #tab-console {
                 height: calc(100vh - 120px);
+                padding: 0;
+            }
+
+                #tab-console .card {
+                    border-radius: 0;
+                }
+
+            .card {
                 padding: 20px;
             }
         }
     </style>
 </head>
 <body>
+    <svg style="display: none;">
+        <symbol id="spinner-icon" viewBox="0 0 50 50">
+            <path fill="currentColor" d="M25,5A20,20,0,1,1,5,25,20,20,0,0,1,25,5 M25,2A23,23,0,1,0,48,25,23,23,0,0,0,25,2Z" transform="translate(0, 0)" />
+            <path fill="currentColor" d="M25,5A20,20,0,0,1,45,25" transform="translate(0, 0)">
+                <animateTransform attributeName="transform" type="rotate" from="0 25 25" to="360 25 25" dur="0.8s" repeatCount="indefinite" />
+            </path>
+        </symbol>
+    </svg>
 
     <!-- Top Navbar -->
     <nav class="navbar">
@@ -532,7 +596,7 @@
     <div class="sidebar" id="sidebar">
         <a href="#" class="active" onclick="showTab('tab-config', this)">⚙️ Configuration</a>
         <a href="#" onclick="showTab('tab-actions', this)">🚀 Actions</a>
-        <a href="#" onclick="showTab('tab-cache', this); loadCache();">🗄️ Cache Database</a>
+        <a href="#" onclick="showTab('tab-cache', this)">🗄️ Cache Database</a>
         <a href="#" onclick="showTab('tab-console', this)">💻 Console Output</a>
     </div>
 
@@ -591,11 +655,10 @@
             <div class="card">
                 <h2>Cache Database</h2>
                 <p style="color: var(--text-muted); margin-bottom: 20px; font-size: 14px;">
-                    These items have been successfully posted to Telegram. Deleting an item here will also attempt to delete its corresponding messages from the Telegram channel.
+                    This table updates in real-time. Editing or deleting an item here will also update/delete its corresponding messages in Telegram.
                 </p>
                 <div class="action-buttons" style="margin-bottom: 20px;">
-                    <button class="btn btn-danger" onclick="confirmClearCache()">🗑 Clear All Cache & Messages</button>
-                    <button class="btn btn-success" onclick="loadCache()">🔄 Refresh Table</button>
+                    <button id="clearCacheBtn" class="btn btn-danger" onclick="confirmClearCache()">🗑 Clear All Cache & Messages</button>
                 </div>
                 <div style="overflow-x: auto;">
                     <table>
@@ -608,7 +671,7 @@
                             </tr>
                         </thead>
                         <tbody id="cacheTableBody">
-                            <tr><td colspan="4" style="text-align: center;">Loading cache...</td></tr>
+                            <tr><td colspan="4" style="text-align: center;">Connecting to real-time service...</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -646,7 +709,35 @@
         </div>
     </div>
 
+    <!-- Edit Cache Item Modal -->
+    <div class="modal-overlay" id="edit-modal">
+        <div class="modal">
+            <h3>✏️ Edit Cache Item</h3>
+            <div class="form-group">
+                <label>Item ID</label>
+                <input type="text" id="edit-itemId">
+            </div>
+            <div class="form-group">
+                <label>URL</label>
+                <input type="text" id="edit-url">
+            </div>
+            <div class="form-group">
+                <label>Message IDs (comma separated)</label>
+                <input type="text" id="edit-messageIds">
+            </div>
+            <input type="hidden" id="edit-oldId">
+            <div class="modal-actions">
+                <button class="btn" onclick="closeEditModal()" style="background: var(--surface-hover);">Cancel</button>
+                <button class="btn btn-primary" onclick="submitEdit()">Save Changes</button>
+            </div>
+        </div>
+    </div>
+
     <script>
+        let currentCacheData =[];
+        let isClearingCache = false;
+        const spinnerIcon = `<svg class="spinner"><use xlink:href="#spinner-icon"></use></svg>`;
+
         // UI Logic
         const sidebar = document.getElementById('sidebar');
         const mainContent = document.getElementById('main-content');
@@ -664,28 +755,16 @@
         }
 
         function showTab(tabId, element) {
-            document.querySelectorAll('.tab-content').forEach(tab => {
-                tab.classList.remove('active');
-            });
-            document.querySelectorAll('.sidebar a').forEach(link => {
-                link.classList.remove('active');
-            });
-
+            document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.sidebar a').forEach(link => link.classList.remove('active'));
             document.getElementById(tabId).classList.add('active');
             element.classList.add('active');
-
-            if (window.innerWidth <= 768) {
-                sidebar.classList.remove('open');
-            }
+            if (window.innerWidth <= 768) sidebar.classList.remove('open');
         }
 
         function togglePassword(inputId) {
             const input = document.getElementById(inputId);
-            if (input.type === "password") {
-                input.type = "text";
-            } else {
-                input.type = "password";
-            }
+            input.type = (input.type === "password") ? "text" : "password";
         }
 
         function showToast(message, type = 'success') {
@@ -702,23 +781,12 @@
             const overlay = document.getElementById('confirm-modal');
             document.getElementById('confirm-message').textContent = message;
             overlay.classList.add('active');
-
             const btnYes = document.getElementById('confirm-yes');
             const btnNo = document.getElementById('confirm-no');
-
             const newBtnYes = btnYes.cloneNode(true);
-            const newBtnNo = btnNo.cloneNode(true);
             btnYes.parentNode.replaceChild(newBtnYes, btnYes);
-            btnNo.parentNode.replaceChild(newBtnNo, btnNo);
-
-            newBtnYes.onclick = () => {
-                overlay.classList.remove('active');
-                onConfirm();
-            };
-
-            newBtnNo.onclick = () => {
-                overlay.classList.remove('active');
-            };
+            newBtnYes.onclick = () => { overlay.classList.remove('active'); onConfirm(); };
+            btnNo.onclick = () => { overlay.classList.remove('active'); };
         }
 
         // API Logic
@@ -740,7 +808,6 @@
                 keyword: document.getElementById('keyword').value,
                 intervalHours: parseFloat(document.getElementById('intervalHours').value)
             };
-
             fetch('/api/config', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -751,74 +818,204 @@
         function runScrape() {
             fetch('/api/scrape', { method: 'POST' })
                 .then(() => {
-                    showToast('Scrape started! Switching to Console Output.', 'success');
-                    const consoleLink = document.querySelector('.sidebar a:nth-child(4)');
+                    showToast('Scrape started! Watch the console for updates.', 'success');
+                    const consoleLink = document.querySelector('.sidebar a[onclick*="tab-console"]');
                     showTab('tab-console', consoleLink);
                 });
         }
 
-        function loadCache() {
-            fetch('/api/cache')
-                .then(res => res.json())
-                .then(data => {
-                    const tbody = document.getElementById('cacheTableBody');
-                    tbody.innerHTML = '';
+        // --- Cache UI Logic ---
+        function renderCacheTable(data) {
+            currentCacheData = data;
+            const tbody = document.getElementById('cacheTableBody');
 
-                    if (data.length === 0) {
-                        tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--text-muted);">Cache is empty.</td></tr>';
-                        return;
+            // Remove any placeholder rows if we have data
+            if (data.length > 0) {
+                const placeholders = tbody.querySelectorAll('tr:not([data-item-id])');
+                placeholders.forEach(p => p.remove());
+            }
+
+            const existingIds = new Set([...tbody.querySelectorAll('tr[data-item-id]')].map(tr => tr.dataset.itemId));
+            const newIds = new Set(data.map(item => item.itemId));
+
+            existingIds.forEach(id => {
+                if (!newIds.has(id)) {
+                    const row = tbody.querySelector(`tr[data-item-id="${id}"]`);
+                    if (row) {
+                        row.style.opacity = '0';
+                        setTimeout(() => row.remove(), 300);
                     }
+                }
+            });
 
-                    data.forEach(item => {
-                        const tr = document.createElement('tr');
-                        tr.innerHTML = `
-                            <td>${item.itemId}</td>
-                            <td><a href="${item.url}" target="_blank" title="${item.url}">Link</a></td>
-                            <td>${item.messageIds.join(', ')}</td>
-                            <td>
-                                <button class="btn btn-danger btn-sm" onclick="deleteCacheItem('${item.itemId}')">Delete</button>
-                            </td>
-                        `;
-                        tbody.appendChild(tr);
-                    });
+            if (data.length === 0 && !isClearingCache) {
+                 tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--text-muted);">Connected. Cache is empty.</td></tr>';
+            } else {
+                data.forEach(item => {
+                    if (!existingIds.has(item.itemId)) {
+                         const tr = document.createElement('tr');
+                         tr.dataset.itemId = item.itemId;
+                         tr.style.opacity = '0';
+                         tr.innerHTML = `
+                             <td>${item.itemId}</td>
+                             <td><a href="${item.url}" target="_blank" title="${item.url}">Link</a></td>
+                             <td>${item.messageIds.join(', ')}</td>
+                             <td class="actions-cell">
+                                 <button class="btn btn-secondary btn-sm" onclick="openEditModal('${item.itemId}')">Edit</button>
+                                 <button class="btn btn-danger btn-sm" onclick="deleteCacheItem(event, '${item.itemId}')">Delete</button>
+                             </td>
+                         `;
+                         tbody.appendChild(tr);
+                         setTimeout(() => tr.style.opacity = '1', 50);
+                    }
                 });
+            }
+
+            const clearCacheBtn = document.getElementById('clearCacheBtn');
+            if (isClearingCache) {
+                clearCacheBtn.disabled = true;
+                if (data.length === 0) {
+                    isClearingCache = false;
+                    clearCacheBtn.innerHTML = '🗑 Clear All Cache & Messages';
+                    setTimeout(() => {
+                        if (currentCacheData.length === 0) {
+                            tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--text-muted);">Connected. Cache is empty.</td></tr>';
+                        }
+                    }, 350);
+                }
+            } else {
+                clearCacheBtn.disabled = (data.length === 0);
+            }
         }
 
-        function deleteCacheItem(itemId) {
+        function openEditModal(itemId) {
+            const item = currentCacheData.find(i => i.itemId === itemId);
+            if (!item) return;
+            document.getElementById('edit-oldId').value = item.itemId;
+            document.getElementById('edit-itemId').value = item.itemId;
+            document.getElementById('edit-url').value = item.url;
+            document.getElementById('edit-messageIds').value = item.messageIds.join(', ');
+            document.getElementById('edit-modal').classList.add('active');
+        }
+
+        function closeEditModal() {
+            document.getElementById('edit-modal').classList.remove('active');
+        }
+
+        function submitEdit() {
+            const oldId = document.getElementById('edit-oldId').value;
+            const updatedItem = {
+                itemId: document.getElementById('edit-itemId').value,
+                url: document.getElementById('edit-url').value,
+                messageIds: document.getElementById('edit-messageIds').value.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n))
+            };
+
+            fetch(`/api/cache/${oldId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(updatedItem)
+            })
+            .then(res => res.ok ? res.json() : Promise.reject('Failed to update'))
+            .then(() => {
+                showToast(`Item ${oldId} updated successfully!`, 'success');
+                closeEditModal();
+            })
+            .catch(() => showToast('Failed to update item.', 'error'));
+        }
+
+        function deleteCacheItem(event, itemId) {
+            const deleteBtn = event.currentTarget;
             showConfirm(`Are you sure you want to delete item ${itemId}? This will also delete the message from Telegram.`, () => {
+                const originalContent = deleteBtn.innerHTML;
+                deleteBtn.disabled = true;
+                deleteBtn.innerHTML = spinnerIcon;
+                deleteBtn.style.padding = '6px';
+                deleteBtn.style.width = '34px';
+
                 fetch(`/api/cache/${itemId}`, { method: 'DELETE' })
+                    .then(res => res.ok ? res.json() : Promise.reject('Failed to delete'))
                     .then(() => {
                         showToast(`Item ${itemId} deleted.`, 'success');
-                        loadCache();
+                    })
+                    .catch(() => {
+                        showToast(`Failed to delete item ${itemId}.`, 'error');
+                        deleteBtn.disabled = false;
+                        deleteBtn.innerHTML = originalContent;
+                        deleteBtn.style.padding = '6px 12px';
+                        deleteBtn.style.width = '';
                     });
             });
         }
 
         function confirmClearCache() {
-            showConfirm("Are you sure you want to clear the entire cache? The bot will delete ALL associated messages from Telegram and re-send items currently on the search page.", () => {
+            showConfirm("Are you sure you want to clear the entire cache? This will delete ALL associated messages from Telegram.", () => {
+                isClearingCache = true;
+                const clearBtn = document.getElementById('clearCacheBtn');
+                clearBtn.disabled = true;
+                clearBtn.innerHTML = `${spinnerIcon} Clearing...`;
+
                 fetch('/api/clearcache', { method: 'POST' })
+                    .then(res => res.ok ? res.json() : Promise.reject('Failed to start cache clearing.'))
                     .then(() => {
-                        showToast('Cache cleared and messages deleted successfully!', 'success');
-                        loadCache();
+                        showToast('Cache clearing process started!', 'success');
+                    })
+                    .catch((err) => {
+                         showToast(err, 'error');
+                         isClearingCache = false;
+                         clearBtn.innerHTML = '🗑 Clear All Cache & Messages';
+                         clearBtn.disabled = (currentCacheData.length === 0);
                     });
             });
         }
 
-        // Poll logs every 2 seconds
-        setInterval(() => {
+        // --- Real-time SignalR Connection ---
+        const connection = new signalR.HubConnectionBuilder()
+            .withUrl("/cacheHub")
+            .withAutomaticReconnect()
+            .build();
+
+        connection.on("CacheUpdated", (data) => {
+            renderCacheTable(data);
+        });
+
+        async function startSignalR() {
+            try {
+                await connection.start();
+                console.log("SignalR Connected.");
+                document.getElementById('cacheTableBody').innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--success-color);">Connected. Loading data...</td></tr>';
+
+                // Initial load after connection is established
+                fetch('/api/cache')
+                    .then(res => res.json())
+                    .then(renderCacheTable)
+                    .catch(err => {
+                        console.error("Failed to fetch initial cache:", err);
+                        document.getElementById('cacheTableBody').innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--primary-color);">Connected, but failed to load cache data.</td></tr>';
+                    });
+            } catch (err) {
+                console.error("SignalR Connection Error: ", err);
+                document.getElementById('cacheTableBody').innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--primary-color);">Could not connect to real-time service. Retrying...</td></tr>';
+                setTimeout(startSignalR, 5000);
+            }
+        }
+
+        // --- Log Polling ---
+        function pollLogs() {
             fetch('/api/logs')
                 .then(res => res.json())
                 .then(logs => {
                     const consoleDiv = document.getElementById('consoleOutput');
                     const isScrolledToBottom = consoleDiv.scrollHeight - consoleDiv.clientHeight <= consoleDiv.scrollTop + 10;
-
                     consoleDiv.textContent = logs.join('\n');
-
                     if (isScrolledToBottom) {
                         consoleDiv.scrollTop = consoleDiv.scrollHeight;
                     }
                 });
-        }, 2000);
+        }
+
+        // Initial Load and Intervals
+        startSignalR();
+        setInterval(pollLogs, 3000);
     </script>
 
 </body>

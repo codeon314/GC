@@ -1,6 +1,7 @@
 ﻿using HtmlAgilityPack;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using System;
@@ -39,6 +40,11 @@ namespace GuitarCenterBot
     }
 
     // ==========================================
+    // REAL-TIME HUB
+    // ==========================================
+    public class CacheHub : Hub { }
+
+    // ==========================================
     // MEMORY LOGGER (For Web UI)
     // ==========================================
     public static class MemoryLogger
@@ -68,12 +74,14 @@ namespace GuitarCenterBot
         private readonly string _cacheFilePath = "cache.json";
         private readonly string _configFilePath = "config.json";
         private readonly SemaphoreSlim _scrapeLock = new(1, 1);
+        private readonly IHubContext<CacheHub> _hubContext;
 
         // Shared HttpClient to prevent socket exhaustion and save CPU/RAM
         private static readonly HttpClient _httpClient = new HttpClient();
 
-        public ScraperService()
+        public ScraperService(IHubContext<CacheHub> hubContext)
         {
+            _hubContext = hubContext;
             if (!_httpClient.DefaultRequestHeaders.Contains("User-Agent"))
             {
                 _httpClient.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36");
@@ -116,42 +124,72 @@ namespace GuitarCenterBot
             }
         }
 
-        public void SaveCache(Dictionary<string, CacheItem> cache)
+        private async Task SaveCacheAndNotifyAsync(Dictionary<string, CacheItem> cache)
         {
             string json = JsonSerializer.Serialize(cache, new JsonSerializerOptions { WriteIndented = true });
-            System.IO.File.WriteAllText(_cacheFilePath, json);
+            await System.IO.File.WriteAllTextAsync(_cacheFilePath, json);
+            await _hubContext.Clients.All.SendAsync("CacheUpdated", cache.Values);
+        }
+
+        public async Task UpdateCacheItemAsync(string oldId, CacheItem newItem)
+        {
+            var cache = GetCache();
+            if (cache.ContainsKey(oldId))
+            {
+                cache.Remove(oldId);
+            }
+            cache[newItem.ItemId] = newItem;
+            await SaveCacheAndNotifyAsync(cache);
+            MemoryLogger.Log($"Updated cache item. Old ID: {oldId}, New ID: {newItem.ItemId}");
         }
 
         public async Task ClearCacheAsync()
         {
             var config = GetConfig();
-            var cache = GetCache();
+            var initialCache = GetCache();
 
+            if (!initialCache.Any())
+            {
+                MemoryLogger.Log("Cache is already empty.");
+                return;
+            }
+
+            TelegramBotClient? botClient = null;
             if (!string.IsNullOrWhiteSpace(config.BotToken) && !string.IsNullOrWhiteSpace(config.ChatId))
             {
-                var botClient = new TelegramBotClient(config.BotToken);
-                MemoryLogger.Log("Deleting all cached messages from Telegram...");
+                botClient = new TelegramBotClient(config.BotToken);
+            }
+            MemoryLogger.Log("Starting to clear cache and delete all messages from Telegram...");
 
-                foreach (var item in cache.Values)
+            var itemIdsToDelete = initialCache.Keys.ToList();
+
+            foreach (var itemId in itemIdsToDelete)
+            {
+                var currentCache = GetCache();
+                if (currentCache.TryGetValue(itemId, out var item))
                 {
-                    foreach (var msgId in item.MessageIds)
+                    if (botClient != null)
                     {
-                        try
+                        foreach (var msgId in item.MessageIds)
                         {
-                            await botClient.DeleteMessageAsync(config.ChatId, msgId);
-                            await Task.Delay(100); // Prevent rate limiting
+                            try
+                            {
+                                await botClient.DeleteMessageAsync(config.ChatId, msgId);
+                                await Task.Delay(50); // Small delay to prevent rate limiting
+                            }
+                            catch { /* Ignore errors */ }
                         }
-                        catch { /* Ignore if message already deleted or not found */ }
                     }
+                    currentCache.Remove(itemId);
+                    await SaveCacheAndNotifyAsync(currentCache); // This saves and notifies UI
+                    MemoryLogger.Log($"Removed item {itemId} during clear operation.");
+                    await Task.Delay(50); // Small delay for UI to feel smoother
                 }
             }
 
-            if (System.IO.File.Exists(_cacheFilePath))
-            {
-                System.IO.File.Delete(_cacheFilePath);
-            }
-            MemoryLogger.Log("Cache cleared and Telegram messages deleted successfully.");
+            MemoryLogger.Log("Cache clearing process complete.");
         }
+
 
         public async Task DeleteCacheItemAsync(string itemId)
         {
@@ -174,7 +212,7 @@ namespace GuitarCenterBot
                     }
                 }
                 cache.Remove(itemId);
-                SaveCache(cache);
+                await SaveCacheAndNotifyAsync(cache);
                 MemoryLogger.Log($"Manually deleted item {itemId} from cache and Telegram.");
             }
         }
@@ -217,7 +255,7 @@ namespace GuitarCenterBot
 
             if (cacheUpdated)
             {
-                SaveCache(cache);
+                await SaveCacheAndNotifyAsync(cache);
             }
             MemoryLogger.Log("Cache validation complete.");
         }
@@ -332,13 +370,7 @@ namespace GuitarCenterBot
                         var match = Regex.Match(link, @"-(\d+)\.gc");
                         if (match.Success)
                         {
-                            itemId = match.Groups[1].Value;
-                        }
-
-                        if (!string.IsNullOrEmpty(itemId) && cache.ContainsKey(itemId))
-                        {
-                            MemoryLogger.Log($"Item {itemId} is already in cache. Skipping.");
-                            continue;
+                            itemId = match.Groups[1].Value.Replace("Item #:", string.Empty);
                         }
 
                         MemoryLogger.Log($"Deep scraping listing: {link}");
@@ -362,12 +394,20 @@ namespace GuitarCenterBot
                             itemId = itemIdNode?.InnerText?.Trim() ?? string.Empty;
                         }
 
+                        // Bulletproof way to ensure ONLY numbers are kept in the itemId
+                        if (!string.IsNullOrEmpty(itemId))
+                        {
+                            itemId = Regex.Replace(itemId, @"[^\d]", "");
+                        }
+
                         if (string.IsNullOrEmpty(itemId))
                         {
                             MemoryLogger.Log("Could not find Item ID. Skipping to avoid spam.");
                             continue;
                         }
 
+                        // Re-check cache after getting a definite ID
+                        cache = GetCache();
                         if (cache.ContainsKey(itemId))
                         {
                             MemoryLogger.Log($"Item {itemId} is already in cache. Skipping.");
@@ -457,13 +497,14 @@ namespace GuitarCenterBot
 
                             MemoryLogger.Log("Successfully sent to Telegram.");
 
+                            cache = GetCache(); // re-fetch cache before adding to it
                             cache[itemId] = new CacheItem
                             {
                                 ItemId = itemId,
                                 Url = link,
                                 MessageIds = sentMessageIds
                             };
-                            SaveCache(cache);
+                            await SaveCacheAndNotifyAsync(cache);
                         }
                         catch (Exception tgEx)
                         {
@@ -547,6 +588,7 @@ namespace GuitarCenterBot
         {
             var builder = WebApplication.CreateBuilder(args);
 
+            builder.Services.AddSignalR();
             builder.Services.AddSingleton<ScraperService>();
             builder.Services.AddHostedService<BackgroundScraper>();
 
@@ -576,6 +618,12 @@ namespace GuitarCenterBot
             // Cache APIs
             app.MapGet("/api/cache", (ScraperService scraper) => Results.Ok(scraper.GetCache().Values));
 
+            app.MapPut("/api/cache/{oldId}", async (string oldId, CacheItem updatedItem, ScraperService scraper) =>
+            {
+                await scraper.UpdateCacheItemAsync(oldId, updatedItem);
+                return Results.Ok(new { message = "Item updated." });
+            });
+
             app.MapDelete("/api/cache/{id}", async (string id, ScraperService scraper) =>
             {
                 await scraper.DeleteCacheItemAsync(id);
@@ -584,9 +632,14 @@ namespace GuitarCenterBot
 
             app.MapPost("/api/clearcache", async (ScraperService scraper) =>
             {
-                await scraper.ClearCacheAsync();
-                return Results.Ok(new { message = "Cache cleared and messages deleted." });
+                // This is now a long-running operation, so we don't await it here.
+                // The service will send SignalR updates as it progresses.
+                _ = Task.Run(() => scraper.ClearCacheAsync());
+                return Results.Ok(new { message = "Cache clearing process started." });
             });
+
+            // Map SignalR Hub
+            app.MapHub<CacheHub>("/cacheHub");
 
             var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
             app.Urls.Add($"http://0.0.0.0:{port}");
